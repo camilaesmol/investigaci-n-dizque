@@ -1,0 +1,71 @@
+import spacy
+import pandas as pd
+import numpy as np
+from fuzzywuzzy import process
+import preprocessor as p
+
+# Función para limpiar tweets
+def clean_tweet(tweet):
+    p.set_options(p.OPT.URL, p.OPT.MENTION)
+    return p.clean(tweet)
+
+# Función para extraer oraciones que contienen una palabra específica
+def extract_sentences_with_word(text, word):
+    doc = nlp(text)
+    target_sentences = []
+
+    for sentence in doc.sents:
+        if word in sentence.text.lower():
+            target_sentences.append(sentence.text)
+
+    return " ".join(target_sentences)
+
+# Función para añadir información de localización
+def add_location_info(row):
+    try:
+        localidad = process.extractOne(row['Localidad'], localidades['localidad'].tolist())[0]
+        departamento = localidades.loc[localidades['localidad'] == localidad, 'departamento'].iloc[0]
+        lat = localidades.loc[localidades['localidad'] == localidad, 'lat'].iloc[0]
+        long = localidades.loc[localidades['localidad'] == localidad, 'long'].iloc[0]
+    except IndexError:
+        departamento = np.nan
+        lat = np.nan
+        long = np.nan
+    return pd.Series({'Departamento': departamento, 'Lat': lat, 'Long': long})
+
+# Inicializar el modelo de spaCy
+nlp = spacy.load("es_dep_news_trf")
+
+# Leer los archivos
+df_dizque = pd.read_csv('dizque_colombia.tsv', sep='\t')
+localidades = pd.read_csv('puntoslocalidades.csv')
+
+# Limpiar los tweets
+df_dizque['tweet_clean'] = df_dizque['tweet'].apply(clean_tweet)
+
+# Inicializar lista vacía para almacenar resultados
+sintacticos = []
+
+# Extraer oraciones que contienen "dizque" o "disque"
+df_dizque['Oración'] = df_dizque['tweet_clean'].apply(lambda x: extract_sentences_with_word(x, 'dizque') or extract_sentences_with_word(x, 'disque'))
+
+# Analizar cada oración
+for index, row in df_dizque.iterrows():
+    sentence = row['Oración']
+    localidad = row['localidad']
+    
+    doc = nlp(sentence)
+    
+    for token in doc:
+        if token.text.lower() in ['dizque', 'disque']:
+            for child in token.children:
+                sintacticos.append((sentence, localidad, token.text, token.pos_, child.text, child.dep_))
+
+# Convertir los resultados en DataFrames
+df_sintacticos = pd.DataFrame(sintacticos, columns=['Oración', 'Localidad', 'Palabra', 'POS_Tag', 'Dependencia', 'Tipo'])
+
+# Añadir información de localización
+df_sintacticos = df_sintacticos.merge(df_sintacticos.apply(add_location_info, axis=1), left_index=True, right_index=True)
+
+# Guardar los resultados en archivos TSV
+df_sintacticos.to_csv('dizque_sintacticos.tsv', sep='\t', index=False)
