@@ -1,0 +1,52 @@
+import os
+import re
+import pandas as pd
+
+# Definir la función para limpiar los tweets
+def clean_tweet(tweet):
+    tweet = tweet.lower()  # Convertir a minúsculas
+    tweet = re.sub(r'https?://\S+|www\.\S+|pic\.twitter\.com/\S+', '', tweet)  # Eliminar URLs
+    tweet = re.sub(r'\.{2,}', '', tweet)  # elimina dos o más puntos consecutivos
+    tweet = re.sub(r',{2,}', '', tweet)  # elimina dos o más comas consecutivas
+    tweet = re.sub(r'[\U00010000-\U0010ffff]', '', tweet)  # Eliminar emojis
+    tweet = tweet.replace("'", "").replace('"', '')  # Eliminar comillas simples y dobles
+    tweet = tweet.replace("\n", " ").replace("\r", " ")  # Eliminar saltillos simples y dobles
+    tweet = re.sub(r'\s{2,}', ' ', tweet)  # Eliminar doble espacio en blanco
+    tweet = re.sub(r'\s…', '', tweet)  # Eliminar ' …' al final de los tweets
+    return tweet.strip()
+
+# Define the function to process each line
+def process_line(line, sep='\t'):
+    fields = line.strip().split(sep)  # Strip newline characters before splitting
+    if len(fields) > 6:  # Assuming there should be 6 fields
+        # Handle the extra fields (for example, by joining the tweet-related fields)
+        fields[2] = ' '.join(fields[2:-3]).strip()
+        fields = fields[:3] + fields[-3:]
+    fields[2] = clean_tweet(fields[2])  # Clean the tweet text
+    return sep.join(fields)
+
+# Define the path to the directory with TSV files
+directory_path = 'corpus_col/twitter'
+
+# Create the 'cleaned' directory if it doesn't exist
+cleaned_directory_path = os.path.join(directory_path, 'cleaned/conhashtag/')
+os.makedirs(cleaned_directory_path, exist_ok=True)
+
+# Loop through each TSV file in the directory
+for filename in os.listdir(directory_path):
+    if filename.endswith('.tsv'):
+        # Open the original TSV file
+        file_path = os.path.join(directory_path, filename)
+        clean_file_path = os.path.join(cleaned_directory_path, f'{os.path.splitext(filename)[0]}_cleanedhashtag.tsv')
+
+        with open(file_path, 'r', encoding='utf-8') as f_in, open(clean_file_path, 'w', encoding='utf-8') as f_out:
+            for line_number, line in enumerate(f_in, 1):
+                try:
+                    # Process each line
+                    processed_line = process_line(line)
+                    f_out.write(processed_line)  # No additional newline added
+                    f_out.write('\n')  # Explicitly add a newline character
+                except Exception as e:
+                    print(f"Error processing line {line_number} in file {filename}: {e}")
+
+print("All files have been cleaned and saved in the 'cleaned' directory.")
