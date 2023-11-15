@@ -1,0 +1,30 @@
+import os
+import pandas as pd
+import re
+
+# Inicializar un DataFrame vacío para almacenar los resultados
+df_dizque = pd.DataFrame(columns=['YYYY-MM-DD', 'tweet', 'país', 'localidad'])
+
+# Listar todos los archivos en el directorio corpus_col/twitter
+for filename in os.listdir('corpus_col/twitter'):
+    if filename.endswith('.tsv'):
+        try:
+            # Leer el archivo .tsv
+            df = pd.read_csv(f'corpus_col/twitter/{filename}', sep='\t', on_bad_lines='skip')
+            
+            # Filtrar los tweets que contienen "dizque" o "disque"
+            pattern = r'\bdizque\b|\bdisque\b'
+            df_filtered = df[df['tweet'].str.contains(pattern, case=False, regex=True)].copy()
+            
+            # Añadir columnas para el país y la localidad basadas en el nombre del archivo
+            country, locality = filename.split('_')[1], filename.split('_')[2].replace('.tsv', '')
+            df_filtered['país'] = country
+            df_filtered['localidad'] = locality
+            
+            # Añadir los resultados al DataFrame general
+            df_dizque = pd.concat([df_dizque, df_filtered[['YYYY-MM-DD', 'tweet', 'país', 'localidad']]])
+        except Exception as e:
+            print(f"Error al procesar el archivo {filename}: {e}")
+
+# Guardar el DataFrame general en un archivo TSV
+df_dizque.to_csv('dizque_colombia.tsv', sep='\t', index=False)
