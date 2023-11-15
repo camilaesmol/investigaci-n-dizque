@@ -1,0 +1,22 @@
+import pandas as pd
+from unidecode import unidecode
+
+# Leer el archivo dizque_colombia.tsv
+df_dizque = pd.read_csv('dizque_colombia.tsv', sep='\t')
+
+# Leer el archivo puntoslocalidades.csv
+df_localidades = pd.read_csv('puntoslocalidades.csv')
+
+# Normalizar las localidades (eliminar tildes y convertir a minúsculas)
+df_dizque['localidad'] = df_dizque['localidad'].apply(lambda x: unidecode(str(x)).lower())
+df_localidades['localidad'] = df_localidades['localidad'].apply(lambda x: unidecode(str(x)).lower())
+
+# Calcular la frecuencia de uso por localidad
+frecuencia_localidad = df_dizque['localidad'].value_counts().reset_index()
+frecuencia_localidad.columns = ['localidad', 'frecuencia']
+
+# Añadir latitud y longitud
+frecuencia_localidad = pd.merge(frecuencia_localidad, df_localidades[['localidad', 'lat', 'long', 'departamento']], on='localidad', how='left')
+
+# Guardar el archivo de informe
+frecuencia_localidad.to_csv('dizque_frecuencia.tsv', sep='\t', index=False)
